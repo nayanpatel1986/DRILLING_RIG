@@ -120,9 +120,9 @@ export default function WellManagementModal({ isOpen, onClose, onWellChanged }) 
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
-            <div className="relative w-full max-w-lg bg-[#1a1c23] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="relative w-full max-w-lg bg-nov-card border border-nov-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                 {/* Header */}
-                <div className="bg-white/5 px-6 py-4 border-b border-white/10 flex items-center justify-between">
+                <div className="bg-white/5 px-6 py-4 border-b border-nov-border flex items-center justify-between">
                     <h2 className="text-lg font-black text-white flex items-center gap-2 tracking-tight">
                         <LayoutPanelTop className="text-nov-accent" size={20} />
                         WELL MANAGEMENT

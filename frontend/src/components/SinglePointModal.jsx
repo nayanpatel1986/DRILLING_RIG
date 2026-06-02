@@ -33,8 +33,8 @@ const SinglePointModal = ({ isOpen, onClose, data }) => {
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[#1a1c23] border border-white/10 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-                <div className="bg-white/5 px-6 py-4 border-b border-white/5 flex items-center justify-between">
+            <div className="bg-nov-card border border-nov-border w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+                <div className="bg-white/5 px-6 py-4 border-b border-nov-border flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Target className="text-purple-400" size={20} />
                         <h2 className="text-lg font-bold text-white uppercase tracking-tight">Single Point Config</h2>

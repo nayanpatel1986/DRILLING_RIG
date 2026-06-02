@@ -3,13 +3,24 @@
 @tailwind utilities;
 
 :root {
-  background-color: #0B1120;
-  color: #ffffff;
+  --bg-theme: #0B1120;
+  --card-bg: #151E32;
+  --card-border: rgba(255, 255, 255, 0.08);
+  --text-color: #ffffff;
+}
+
+body {
+  background-color: var(--bg-theme);
+  color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 @layer components {
   .card {
-    @apply bg-nov-card border border-white/10 rounded-lg p-4 shadow-lg backdrop-blur-sm;
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-color);
+    @apply rounded-lg p-4 shadow-lg backdrop-blur-sm transition-all duration-300;
   }
   .btn {
     @apply px-4 py-2 rounded font-medium transition-all duration-200 active:scale-95;
@@ -184,3 +195,43 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.4) !important;
 }
+
+/* Light Theme Adaptations */
+html[data-theme="light"] .text-white {
+  color: #0f172a !important;
+}
+html[data-theme="light"] .text-gray-200 {
+  color: #1e293b !important;
+}
+html[data-theme="light"] .text-gray-300 {
+  color: #334155 !important;
+}
+html[data-theme="light"] .text-gray-400 {
+  color: #475569 !important;
+}
+html[data-theme="light"] .text-gray-500 {
+  color: #64748b !important;
+}
+html[data-theme="light"] .bg-white\/5 {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+html[data-theme="light"] .bg-white\/\[0\.03\] {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+html[data-theme="light"] .bg-white\/\[0\.02\] {
+  background-color: rgba(0, 0, 0, 0.02) !important;
+}
+html[data-theme="light"] .border-white\/5 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+html[data-theme="light"] .border-white\/10 {
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+html[data-theme="light"] .bg-slate-900\/90 {
+  background-color: #f1f5f9 !important;
+}
+html[data-theme="light"] .bg-slate-800\/50 {
+  background-color: #f8fafc !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+

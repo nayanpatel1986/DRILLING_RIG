@@ -9,8 +9,9 @@ export default {
             colors: {
                 nov: {
                     blue: '#004B8D',  // Classic NOV Blue
-                    dark: '#0B1120',  // Deep background
-                    card: '#151E32',  // Card background
+                    dark: 'var(--bg-theme, #0B1120)',  // Deep background
+                    card: 'var(--card-bg, #151E32)',  // Card background
+                    border: 'var(--card-border, rgba(255, 255, 255, 0.08))',
                     accent: '#00A3E0', // Cyan accent
                     warning: '#F59E0B',
                     danger: '#EF4444',

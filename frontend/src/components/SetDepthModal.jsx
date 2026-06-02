@@ -89,7 +89,7 @@ export default function SetDepthModal({ isOpen, onClose, currentDepth, currentBi
     // USE PORTAL TO AVOID CLIPPING BY DASHBOARD PARENTS
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-[#1a1c23] border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+            <div className="bg-nov-card border border-nov-border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)]">
                 
                 {/* Header */}
                 <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 border-b border-white/10 flex items-center justify-between">

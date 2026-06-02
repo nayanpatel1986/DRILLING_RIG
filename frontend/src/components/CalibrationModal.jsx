@@ -57,9 +57,9 @@ const CalibrationModal = ({ isOpen, onClose, data }) => {
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[#1a1c23] border border-white/10 w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="bg-nov-card border border-nov-border w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="bg-white/5 px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                <div className="bg-white/5 px-4 py-3 border-b border-nov-border flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Target className="text-cyan-400" size={18} />
                         <h2 className="text-md font-bold text-white uppercase tracking-tight">Five Point Calibration</h2>

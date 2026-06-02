@@ -105,6 +105,38 @@ export default function WellManager({ role }) {
         return localStorage.getItem('drillbit_twin_bg_theme') || '#0b0c10';
     });
 
+    const THEME_PRESETS = {
+        '#0b0c10': { bg: '#0b0c10', card: '#151e32', border: 'rgba(255, 255, 255, 0.08)', text: '#ffffff' }, // Navy (Classic)
+        '#030712': { bg: '#030712', card: '#0f172a', border: 'rgba(255, 255, 255, 0.06)', text: '#ffffff' }, // Black
+        '#1e293b': { bg: '#1e293b', card: '#0f172a', border: 'rgba(255, 255, 255, 0.06)', text: '#ffffff' }, // Slate
+        '#020617': { bg: '#020617', card: '#0b1329', border: 'rgba(255, 255, 255, 0.08)', text: '#ffffff' }, // Midnight
+        '#18181b': { bg: '#18181b', card: '#27272a', border: 'rgba(255, 255, 255, 0.1)',  text: '#ffffff' }, // Charcoal
+        '#062016': { bg: '#062016', card: '#0a3625', border: 'rgba(255, 255, 255, 0.08)', text: '#ffffff' }, // Forest
+        '#27050f': { bg: '#27050f', card: '#470b1d', border: 'rgba(255, 255, 255, 0.1)',  text: '#ffffff' }, // Burgundy
+        '#e2e8f0': { bg: '#e2e8f0', card: '#ffffff', border: 'rgba(0, 0, 0, 0.08)',          text: '#0f172a' }, // Silver (Light)
+        '#f8fafc': { bg: '#f8fafc', card: '#ffffff', border: 'rgba(0, 0, 0, 0.06)',          text: '#0f172a' }, // Ice (Light)
+        '#f5f2eb': { bg: '#f5f2eb', card: '#ffffff', border: 'rgba(0, 0, 0, 0.06)',          text: '#0f172a' }  // Sand (Light)
+    };
+
+    const applyTheme = (color) => {
+        const theme = THEME_PRESETS[color] || THEME_PRESETS['#0b0c10'];
+        const root = document.documentElement;
+        root.style.setProperty('--bg-theme', theme.bg);
+        root.style.setProperty('--card-bg', theme.card);
+        root.style.setProperty('--card-border', theme.border);
+        root.style.setProperty('--text-color', theme.text);
+        
+        if (['#e2e8f0', '#f8fafc', '#f5f2eb'].includes(color)) {
+            root.setAttribute('data-theme', 'light');
+        } else {
+            root.setAttribute('data-theme', 'dark');
+        }
+    };
+
+    useEffect(() => {
+        applyTheme(currentBg);
+    }, [currentBg]);
+
     const selectTheme = (color) => {
         setCurrentBg(color);
         localStorage.setItem('drillbit_twin_bg_theme', color);
@@ -191,44 +223,42 @@ export default function WellManager({ role }) {
                                         );
                                     })}
 
-                                    {/* BG THEME SELECTOR FOR VIEWERS */}
-                                    {isViewerRole && (
-                                        <div className="border-t border-white/5 px-5 py-3 mt-1 flex flex-col gap-2">
-                                            <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-widest">
-                                                Theme Background:
-                                            </span>
-                                            <div className="grid grid-cols-5 gap-2">
-                                                {[
-                                                    { value: '#0b0c10', color: '#0b0c10', title: 'Navy' },
-                                                    { value: '#030712', color: '#030712', title: 'Black' },
-                                                    { value: '#1e293b', color: '#1e293b', title: 'Slate' },
-                                                    { value: '#020617', color: '#020617', title: 'Midnight' },
-                                                    { value: '#18181b', color: '#18181b', title: 'Charcoal' },
-                                                    { value: '#062016', color: '#062016', title: 'Forest' },
-                                                    { value: '#27050f', color: '#27050f', title: 'Burgundy' },
-                                                    { value: '#e2e8f0', color: '#e2e8f0', title: 'Silver' },
-                                                    { value: '#f8fafc', color: '#f8fafc', title: 'Ice' },
-                                                    { value: '#f5f2eb', color: '#f5f2eb', title: 'Sand' }
-                                                ].map((t) => (
-                                                    <button
-                                                        key={t.value}
-                                                        onClick={() => selectTheme(t.value)}
-                                                        className={`w-6 h-6 rounded-full border transition-all hover:scale-110 flex items-center justify-center ${
-                                                            currentBg === t.value ? 'border-cyan-400 ring-2 ring-cyan-400/20' : 'border-white/10 hover:border-white/40'
-                                                        }`}
-                                                        style={{ backgroundColor: t.color }}
-                                                        title={t.title}
-                                                    >
-                                                        {currentBg === t.value && (
-                                                            <span className={`text-[10px] font-black ${
-                                                                ['#e2e8f0', '#f8fafc', '#f5f2eb'].includes(t.value) ? 'text-black' : 'text-white'
-                                                            }`}>✓</span>
-                                                        )}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                    {/* BG THEME SELECTOR */}
+                                    <div className="border-t border-white/5 px-5 py-3 mt-1 flex flex-col gap-2">
+                                        <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-widest">
+                                            Theme Preset:
+                                        </span>
+                                        <div className="grid grid-cols-5 gap-2">
+                                            {[
+                                                { value: '#0b0c10', color: '#0b0c10', title: 'Navy' },
+                                                { value: '#030712', color: '#030712', title: 'Black' },
+                                                { value: '#1e293b', color: '#1e293b', title: 'Slate' },
+                                                { value: '#020617', color: '#020617', title: 'Midnight' },
+                                                { value: '#18181b', color: '#18181b', title: 'Charcoal' },
+                                                { value: '#062016', color: '#062016', title: 'Forest' },
+                                                { value: '#27050f', color: '#27050f', title: 'Burgundy' },
+                                                { value: '#e2e8f0', color: '#e2e8f0', title: 'Silver' },
+                                                { value: '#f8fafc', color: '#f8fafc', title: 'Ice' },
+                                                { value: '#f5f2eb', color: '#f5f2eb', title: 'Sand' }
+                                            ].map((t) => (
+                                                <button
+                                                    key={t.value}
+                                                    onClick={() => selectTheme(t.value)}
+                                                    className={`w-6 h-6 rounded-full border transition-all hover:scale-110 flex items-center justify-center ${
+                                                        currentBg === t.value ? 'border-cyan-400 ring-2 ring-cyan-400/20' : 'border-white/10 hover:border-white/40'
+                                                    }`}
+                                                    style={{ backgroundColor: t.color }}
+                                                    title={t.title}
+                                                >
+                                                    {currentBg === t.value && (
+                                                        <span className={`text-[10px] font-black ${
+                                                            ['#e2e8f0', '#f8fafc', '#f5f2eb'].includes(t.value) ? 'text-black' : 'text-white'
+                                                        }`}>✓</span>
+                                                    )}
+                                                </button>
+                                            ))}
                                         </div>
-                                    )}
+                                    </div>
 
                                     <div className="border-t border-white/5 my-1" />
                                 </div>

@@ -106,7 +106,7 @@ const ParameterSettingsModal = ({
 
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-            <div className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#1a1c23] shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+            <div className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-nov-border bg-nov-card shadow-[0_0_50px_rgba(0,0,0,0.5)]">
                 <div className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="rounded-lg bg-red-500/10 p-2">
@@ -333,7 +333,7 @@ const ParameterSettingsModal = ({
             {/* Numeric Touchscreen Keypad Modal */}
             {keypadTarget && (
                 <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#15171e] p-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 duration-150">
+                    <div className="w-full max-w-md rounded-2xl border border-nov-border bg-nov-card p-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 duration-150">
                         {/* Title showing which parameter & limit is being changed */}
                         <div className="text-center mb-4">
                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>

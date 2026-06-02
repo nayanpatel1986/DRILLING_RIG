@@ -37,7 +37,7 @@ const SafetyGate = ({ isOpen, onClose, onSuccess, title = "Safety Override Requi
 
     return createPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
-            <div className="bg-[#1a1c23] border border-white/10 rounded-3xl w-full max-w-xs overflow-hidden shadow-2xl animate-zoom-in">
+            <div className="bg-nov-card border border-nov-border rounded-3xl w-full max-w-xs overflow-hidden shadow-2xl animate-zoom-in">
                 {/* Header */}
                 <div className="p-6 text-center space-y-2">
                     <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
