@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+backend/.venv/
+backend/env/
+.pytest_cache/
+
+# Databases
+backend/*.db
+backend/instance/
+
+# Logs
+backend/logs/
+*.log
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/node_modules/
+node.zip
+node-v18.17.1-win-x64/
+
+# Environment / Secrets
+.env
+.env.local
+.env.*.local
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project Artifacts
+staged_diff.txt
+diff.txt
+old_drilling_twin.txt
+curves.txt
+all_maps*.txt
+
+# Extra Ignores
+docker_images/
+brain/
+tmp/
+.git_backup/
+
+

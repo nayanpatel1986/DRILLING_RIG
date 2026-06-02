@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 200" width="100%">
+  <style>
+    .ongc-text {
+      font-family: 'Montserrat', 'Inter', 'Segoe UI', sans-serif;
+      font-weight: 800;
+    }
+  </style>
+  <g transform="translate(10, 10)">
+    <!-- Letters onGC -->
+    <text x="30" y="110" font-size="120" class="ongc-text" fill="#b02a2a" letter-spacing="-6">on</text>
+    <text x="180" y="110" font-size="120" class="ongc-text" fill="#008844" letter-spacing="-6">GC</text>
+    
+    <!-- Red-Green Divider line -->
+    <defs>
+      <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#b02a2a" />
+        <stop offset="50%" stop-color="#785937" />
+        <stop offset="100%" stop-color="#008844" />
+      </linearGradient>
+    </defs>
+    <rect x="30" y="130" width="430" height="6" fill="url(#lineGrad)" rx="3" />
+    
+    <!-- Tagline: ENERGY: Now AND Next -->
+    <text x="30" y="180" font-size="34" class="ongc-text" fill="#008844" letter-spacing="1">ENER</text>
+    <!-- Lightning/circular arrow icon for G -->
+    <g transform="translate(132, 150) scale(0.9)">
+      <!-- The outer circle with arrows -->
+      <path d="M 18,5 A 15,15 0 1,1 5,18" fill="none" stroke="#e68a00" stroke-width="4" stroke-linecap="round" />
+      <path d="M 5,18 A 15,15 0 1,1 18,31" fill="none" stroke="#0066cc" stroke-width="4" stroke-linecap="round" />
+      <!-- Arrowheads -->
+      <polygon points="18,1 23,8 14,7" fill="#e68a00" />
+      <polygon points="18,36 13,29 22,30" fill="#0066cc" />
+      <!-- Lightning bolt in middle -->
+      <polygon points="17,8 8,20 15,20 13,30 22,16 15,16" fill="#e68a00" />
+    </g>
+    <text x="174" y="180" font-size="34" class="ongc-text" fill="#008844" letter-spacing="1">Y:</text>
+    
+    <!-- Now AND Next -->
+    <text x="215" y="180" font-size="34" class="ongc-text" fill="#b02a2a" letter-spacing="1">Now</text>
+    <text x="305" y="180" font-size="34" class="ongc-text" fill="#FFFFFF" letter-spacing="1">AND</text>
+    <text x="390" y="180" font-size="34" class="ongc-text" fill="#008844" letter-spacing="1">Next</text>
+  </g>
+</svg>

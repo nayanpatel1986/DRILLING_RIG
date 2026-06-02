@@ -1,0 +1,186 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  background-color: #0B1120;
+  color: #ffffff;
+}
+
+@layer components {
+  .card {
+    @apply bg-nov-card border border-white/10 rounded-lg p-4 shadow-lg backdrop-blur-sm;
+  }
+  .btn {
+    @apply px-4 py-2 rounded font-medium transition-all duration-200 active:scale-95;
+  }
+  .btn-primary {
+    @apply bg-nov-blue hover:bg-nov-blue/90 text-white;
+  }
+}
+
+/* Hide default browser scrollbars for a clean dashboard UI */
+*::-webkit-scrollbar {
+  display: none !important;
+}
+
+* {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
+}
+
+/* React Grid Layout Styling */
+.react-grid-placeholder {
+  background: rgba(14, 165, 233, 0.1) !important;
+  border: 2px dashed #0EA5E9 !important;
+  border-radius: 12px !important;
+  opacity: 0.5 !important;
+  z-index: 2 !important;
+}
+
+/* Make resize handles visible on hover or during resize */
+.react-grid-item:hover .react-resizable-handle,
+.react-grid-item.resizing .react-resizable-handle {
+  opacity: 1 !important;
+}
+
+/* Base style for all handles - ALWAYS VISIBLE */
+.react-resizable-handle {
+  position: absolute;
+  z-index: 1000 !important;
+  opacity: 0.5;
+  transition: opacity 0.2s, background-color 0.2s, border-color 0.2s;
+  pointer-events: auto !important;
+}
+
+/* South (Bottom) Handle - DRASTICALLY INCREASED HIT AREA */
+.react-resizable-handle-s {
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 12px;
+  cursor: ns-resize;
+  border-bottom: 3px solid transparent;
+}
+.react-resizable-handle-s:hover {
+  border-bottom-color: #0EA5E9;
+  background: linear-gradient(to top, rgba(14, 165, 233, 0.4), transparent);
+  filter: drop-shadow(0 -4px 8px #0EA5E9);
+}
+
+/* East (Right) Handle - DRASTICALLY INCREASED HIT AREA */
+.react-resizable-handle-e {
+  top: 0;
+  right: -4px;
+  width: 12px;
+  height: 100%;
+  cursor: ew-resize;
+  border-right: 3px solid transparent;
+}
+.react-resizable-handle-e:hover {
+  border-right-color: #0EA5E9;
+  background: linear-gradient(to left, rgba(14, 165, 233, 0.4), transparent);
+  filter: drop-shadow(-4px 0 8px #0EA5E9);
+}
+
+/* South-East (Corner) Handle */
+.react-resizable-handle-se {
+  bottom: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  cursor: nwse-resize;
+  background-color: rgba(14, 165, 233, 0.1);
+  border-radius: 4px;
+}
+
+.react-resizable-handle-se::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 14px;
+  height: 14px;
+  border-right: 4px solid #0EA5E9;
+  border-bottom: 4px solid #0EA5E9;
+  border-radius: 2px;
+}
+
+.react-resizable-handle-se:hover::after {
+  border-color: #38bdf8;
+  filter: drop-shadow(0 0 10px #0EA5E9);
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-[#1a1c23]/60 backdrop-blur-md border border-white/5 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+  }
+  
+  .deep-space-bg {
+    background: radial-gradient(circle at center, #1b1e2e 0%, #0b0d17 100%);
+  }
+
+  .neon-border-green {
+    @apply border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)];
+  }
+  
+  .neon-border-red {
+    @apply border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.1)];
+  }
+  
+  .neon-border-amber {
+    @apply border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.1)];
+  }
+
+  .text-glow-green {
+    text-shadow: 0 0 10px rgba(16,185,129,0.5);
+  }
+
+  .text-glow-red {
+    text-shadow: 0 0 10px rgba(244,63,94,0.5);
+  }
+
+  .text-glow-amber {
+    text-shadow: 0 0 10px rgba(245,158,11,0.5);
+  }
+}
+
+@keyframes pulse-glow-green {
+  0% { box-shadow: 0 0 5px rgba(16,185,129,0.2); border-color: rgba(16,185,129,0.2); }
+  50% { box-shadow: 0 0 20px rgba(16,185,129,0.4); border-color: rgba(16,185,129,0.5); }
+  100% { box-shadow: 0 0 5px rgba(16,185,129,0.2); border-color: rgba(16,185,129,0.2); }
+}
+
+.animate-pulse-green {
+  animation: pulse-glow-green 2s infinite ease-in-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+/* Custom Scrollbar Utility */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+  display: block !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-radius: 10px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2) !important;
+  border-radius: 10px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4) !important;
+}

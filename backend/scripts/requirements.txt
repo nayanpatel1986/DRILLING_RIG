@@ -1,0 +1,18 @@
+fastapi==0.109.0
+uvicorn==0.27.0
+websockets==12.0
+pandas==2.2.0
+influxdb-client==1.39.0
+paho-mqtt==1.6.1
+psycopg2-binary==2.9.9
+requests==2.31.0
+xmltodict==0.13.0
+lxml==4.9.3
+python-dotenv==1.0.0
+# For WITSML SOAP if needed, otherwise just XML parsing
+zeep==4.2.1
+sqlalchemy==2.0.23
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+python-multipart
+pymodbus==3.6.1
