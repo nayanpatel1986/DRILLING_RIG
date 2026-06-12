@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, Calendar, RefreshCw, SlidersHorizontal, Zap, Plus, Minus, Download } from 'lucide-react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { Activity, Calendar, RefreshCw, SlidersHorizontal, Zap, Plus, Minus, Download, X, RotateCcw } from 'lucide-react';
 import {
-    Area, AreaChart, CartesianGrid,
-    ResponsiveContainer, Tooltip, XAxis, YAxis,
+    Area, AreaChart, Line, LineChart, CartesianGrid,
+    ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine,
 } from 'recharts';
 import { getRigData, getRigHistory, getRigHistoryRange } from '../api';
 import { getStoredRole } from '../auth';
@@ -11,13 +11,14 @@ import ExportDataModal from '../components/ExportDataModal';
 
 // ── Time Ranges ────────────────────────────────────────────────────────────────
 const QUICK_RANGES = [
-    { label: '1m',  value: '-1m'  },
-    { label: '5m',  value: '-5m'  },
-    { label: '10m', value: '-10m' },
-    { label: '30m', value: '-30m' },
-    { label: '1h',  value: '-1h'  },
-    { label: '24h', value: '-24h' },
-    { label: '6M',  value: '-180d' },
+    { label: '1M',  value: '-1m'  },
+    { label: '5M',  value: '-5m'  },
+    { label: '15M', value: '-15m' },
+    { label: '30M', value: '-30m' },
+    { label: '1H',  value: '-1h'  },
+    { label: '6H',  value: '-6h'  },
+    { label: '12H', value: '-12h' },
+    { label: '24H', value: '-24h' },
 ];
 
 const ZOOM_LEVELS = [
@@ -81,6 +82,32 @@ const DEFAULT_PAIRS = [
     [{ key: 'STP_PRS', max: 5000 }, { key: 'GAIN_LSS', max: 20 }],
 ];
 
+const COLOR_PRESETS = [
+    '#1d4ed8', '#ec4899', '#0d9488', '#ea580c', '#6366f1', '#e11d48',
+    '#22c55e', '#f59e0b', '#8b5cf6', '#06b6d4', '#d946ef', '#f43f5e'
+];
+
+const DEFAULT_TRACKS = [
+    {
+        pens: [
+            { metric: 'WOH', min: 0, max: 300, color: '#1d4ed8' },
+            { metric: 'WOB', min: 0, max: 50, color: '#ec4899' }
+        ]
+    },
+    {
+        pens: [
+            { metric: 'TORQUE', min: 0, max: 50, color: '#0d9488' },
+            { metric: 'RPM', min: 0, max: 200, color: '#ea580c' }
+        ]
+    },
+    {
+        pens: [
+            { metric: 'STP_PRS', min: 0, max: 5000, color: '#6366f1' },
+            { metric: 'GAIN_LSS', min: -6, max: 6, color: '#e11d48' }
+        ]
+    }
+];
+
 // Panel accent + gradient stop pairs
 const PANEL_THEMES = [
     { accent: '#38bdf8', gradient: ['#38bdf8', '#7dd3fc'] },  // P1 — Light Sky
@@ -121,6 +148,11 @@ function fmtAxisTimeByRange(value, durationMs) {
     const d = new Date(value);
     const hh = String(d.getHours()).padStart(2, '0');
     const mm = String(d.getMinutes()).padStart(2, '0');
+    if (durationMs > 24 * 3600_000) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${day}/${month} ${hh}:${mm}`;
+    }
     return `${hh}:${mm}`;
 }
 function fmtDate(iso) {
@@ -196,14 +228,59 @@ function DualTooltip({ active, payload, accent }) {
 }
 
 // ── Dual Track Panel ───────────────────────────────────────────────────────────
-function DualTrackPanel({ track1, track2, data, liveValues, onSelect1, onSelect2, onUpdateMax1, onUpdateMax2, panelIdx, timeDomain, timeLabelFormatter }) {
-    const id1 = `grad-${panelIdx}-0`;
-    const id2 = `grad-${panelIdx}-1`;
+// ── Dual Track Panel ───────────────────────────────────────────────────────────
+function DualTrackPanel({ 
+    pens = [], 
+    data = [], 
+    liveValues = {}, 
+    onSelect, 
+    onUpdateMin, 
+    onUpdateMax, 
+    panelIdx, 
+    timeDomain, 
+    timeLabelFormatter,
+    isDepthLog = false,
+    clickedTimestamp = null,
+    onClick = () => {}
+}) {
+    const computedTicks = useMemo(() => {
+        if (!timeDomain || !timeDomain[0] || !timeDomain[1]) return undefined;
+        const [start, end] = timeDomain;
+        const duration = end - start;
+        
+        // Choose tick interval based on duration
+        let intervalMs = 60_000; // default 1 minute
+        if (duration <= 120_000) { // 1-2 min -> 15s ticks
+            intervalMs = 15_000;
+        } else if (duration <= 300_000) { // 5 min -> 1 min ticks
+            intervalMs = 60_000;
+        } else if (duration <= 900_000) { // 15 min -> 3 min ticks
+            intervalMs = 3 * 60_000;
+        } else if (duration <= 1800_000) { // 30 min -> 5 min ticks
+            intervalMs = 5 * 60_000;
+        } else if (duration <= 3600_000) { // 1 hour -> 10 min ticks
+            intervalMs = 10 * 60_000;
+        } else if (duration <= 21600_000) { // 6 hours -> 1 hour ticks
+            intervalMs = 3600_000;
+        } else if (duration <= 43200_000) { // 12 hours -> 2 hour ticks
+            intervalMs = 2 * 3600_000;
+        } else if (duration <= 86400_000) { // 24 hours -> 4 hour ticks
+            intervalMs = 4 * 3600_000;
+        } else { // > 24 hours -> 12 hour ticks
+            intervalMs = 12 * 3600_000;
+        }
 
+        const ticksArr = [];
+        const alignedStart = Math.ceil(start / intervalMs) * intervalMs;
+        for (let t = alignedStart; t <= end; t += intervalMs) {
+            ticksArr.push(t);
+        }
+        return ticksArr;
+    }, [timeDomain]);
     return (
         <div style={{
             display: 'flex', flexDirection: 'column', height: '100%',
-            borderRadius: 20, overflow: 'hidden', position: 'relative',
+            borderRadius: 20, position: 'relative',
             background: `#ffffff`,
             border: `1px solid #cbd5e1`,
             boxShadow: `0 4px 12px rgba(0,0,0,0.05)`,
@@ -211,10 +288,17 @@ function DualTrackPanel({ track1, track2, data, liveValues, onSelect1, onSelect2
         }}>
             {/* Header */}
             <div style={{
+                height: 38, boxSizing: 'border-box',
                 flexShrink: 0, padding: '7px 12px',
                 background: `#f8fafc`,
                 borderBottom: `1px solid #e2e8f0`,
                 display: 'flex', alignItems: 'center', gap: 8,
+                overflow: 'hidden',
+                position: 'sticky',
+                top: 0,
+                zIndex: 10,
+                borderTopLeftRadius: 18,
+                borderTopRightRadius: 18,
             }}>
                 {/* Animated pulse dot */}
                 <div style={{
@@ -226,198 +310,240 @@ function DualTrackPanel({ track1, track2, data, liveValues, onSelect1, onSelect2
                 <span style={{
                     fontSize: 11, fontWeight: 900, textTransform: 'uppercase',
                     letterSpacing: 4, color: '#475569',
+                    whiteSpace: 'nowrap'
                 }}>
-                    Panel {panelIdx + 1}
+                    {isDepthLog ? 'Depth Log' : `Strip ${panelIdx + 1}`}
                 </span>
-                {/* Track color pills */}
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                    {[track1, track2].map((t, i) => (
-                        <div key={`${t.key}-${i}`} style={{
-                            display: 'flex', alignItems: 'center', gap: 4,
-                            background: `${t.color}15`, 
-                            border: `1.5px solid ${t.color}60`,
-                            borderRadius: 20, padding: '1px 8px',
-                            opacity: i === 1 ? 0.8 : 1
-                        }}>
-                            <div style={{ 
-                                width: 5, height: 5, borderRadius: '50%', background: t.color, 
-                                boxShadow: i === 0 ? `0 0 6px ${t.color}` : 'none',
-                                opacity: i === 1 ? 0.7 : 1
-                            }} />
-                            <span style={{ fontSize: 8, color: t.color, fontWeight: 900, letterSpacing: 1, textTransform: 'uppercase' }}>
-                                {t.title} ({t.max || 'Auto'})
-                            </span>
-                        </div>
-                    ))}
-                </div>
             </div>
 
             {/* Chart */}
             <div style={{ flex: 1, minHeight: 0, padding: '4px 4px 2px' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
+                    <LineChart
                         data={data}
                         syncId="edr_sync"
                         margin={{ top: 20, right: 8, left: 4, bottom: 20 }}
                         layout="vertical"
+                        style={{ cursor: 'pointer' }}
+                        onClick={(state) => {
+                            if (state) {
+                                const ts = state.activeLabel || (state.activeTooltipIndex !== undefined && data[state.activeTooltipIndex]?.timestamp);
+                                if (ts) {
+                                    onClick(Number(ts));
+                                }
+                            }
+                        }}
                     >
-                        <defs>
-                            <linearGradient id={id1} x1="0" y1="0" x2="1" y2="0">
-                                <stop offset="5%" stopColor={track1.color} stopOpacity={0.15} />
-                                <stop offset="95%" stopColor={track1.color} stopOpacity={0.01} />
-                            </linearGradient>
-                            <linearGradient id={id2} x1="0" y1="0" x2="1" y2="0">
-                                <stop offset="5%" stopColor={track2.color} stopOpacity={0.15} />
-                                <stop offset="95%" stopColor={track2.color} stopOpacity={0.01} />
-                            </linearGradient>
-                        </defs>
                         <CartesianGrid stroke="#e2e8f0" strokeDasharray="4 4" />
-                        <XAxis
-                            xAxisId="top"
-                            orientation="top"
-                            type="number"
-                            tick={false}
-                            axisLine={{ stroke: '#cbd5e1' }}
-                            tickLine={false}
-                            height={4}
-                            domain={[0, track1.max || 'auto']}
-                        />
-                        <XAxis
-                            xAxisId="bottom"
-                            orientation="bottom"
-                            type="number"
-                            tick={false}
-                            axisLine={{ stroke: '#cbd5e1' }}
-                            tickLine={false}
-                            height={4}
-                            domain={[0, track2.max || 'auto']}
-                        />
+                        {pens.map((pen, i) => (
+                            <XAxis
+                                key={`xaxis-${i}`}
+                                xAxisId={`x-${i}`}
+                                orientation="top"
+                                type="number"
+                                tick={false}
+                                axisLine={i === 0 ? { stroke: '#cbd5e1' } : false}
+                                tickLine={false}
+                                height={i === 0 ? 4 : 0}
+                                domain={[pen.min !== undefined ? pen.min : 0, pen.max || 'auto']}
+                            />
+                        ))}
                         <YAxis
                             dataKey="timestamp"
-                            type="category"
+                            type="number"
+                            domain={timeDomain || ['auto', 'auto']}
+                            ticks={computedTicks}
                             tick={{ fill: '#64748b', fontSize: 9, fontFamily: 'sans-serif', fontWeight: 600 }}
                             axisLine={{ stroke: '#cbd5e1' }}
                             tickLine={false}
                             tickFormatter={timeLabelFormatter || fmtAxisTime}
-                            minTickGap={24}
-                            width={34}
-                            reversed={true}
+                            minTickGap={10}
+                            width={36}
                         />
                         <Tooltip
                             content={props => <DualTooltip {...props} accent="#94a3b8" />}
                             cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeOpacity: 0.5, strokeDasharray: '4 4' }}
                         />
-                        <Area
-                            xAxisId="top"
-                            type="monotoneY"
-                            dataKey={track1.key}
-                            name={track1.title}
-                            stroke={track1.color}
-                            strokeWidth={3}
-                            fill={`url(#${id1})`}
-                            dot={false}
-                            activeDot={{ r: 4, fill: '#fff', stroke: track1.color, strokeWidth: 2 }}
-                            connectNulls
-                            isAnimationActive={false}
-                        />
-                        <Area
-                            xAxisId="bottom"
-                            type="monotoneY"
-                            dataKey={track2.key}
-                            name={track2.title}
-                            stroke={track2.color}
-                            strokeWidth={1.5}
-                            strokeOpacity={0.7}
-                            fill={`url(#${id2})`}
-                            dot={false}
-                            activeDot={{ r: 4, fill: '#fff', stroke: track2.color, strokeWidth: 2 }}
-                            connectNulls
-                            isAnimationActive={false}
-                        />
-                    </AreaChart>
+                        {clickedTimestamp && (
+                            <ReferenceLine
+                                y={clickedTimestamp}
+                                stroke="#f59e0b"
+                                strokeWidth={1.5}
+                                strokeDasharray="4 4"
+                                label={{ 
+                                    value: fmtAxisTime(clickedTimestamp), 
+                                    fill: '#f59e0b', 
+                                    fontSize: 9, 
+                                    fontWeight: 700,
+                                    position: 'insideLeft',
+                                    offset: 5
+                                }}
+                            />
+                        )}
+                        {pens.map((pen, i) => {
+                            const opt = TRACK_OPTIONS.find(o => o.key === pen.metric) || { title: pen.metric };
+                            return (
+                                <Line
+                                    key={`line-${pen.metric}-${i}`}
+                                    xAxisId={`x-${i}`}
+                                    type="monotoneY"
+                                    dataKey={pen.metric}
+                                    name={opt.title}
+                                    stroke={pen.color}
+                                    strokeWidth={2.5}
+                                    dot={false}
+                                    activeDot={{ r: 4, fill: '#fff', stroke: pen.color, strokeWidth: 2 }}
+                                    connectNulls
+                                    isAnimationActive={false}
+                                />
+                            );
+                        })}
+                    </LineChart>
                 </ResponsiveContainer>
             </div>
 
             {/* Bottom value + selector strip */}
-            <div style={{
-                flexShrink: 0,
-                borderTop: `1px solid #e2e8f0`,
-                display: 'grid', gridTemplateColumns: '1fr 1fr',
-                background: `#ffffff`,
-            }}>
-                {[{ track: track1, onSelect: onSelect1, onUpdateMax: onUpdateMax1 }, { track: track2, onSelect: onSelect2, onUpdateMax: onUpdateMax2 }].map(({ track, onSelect, onUpdateMax }, i) => (
-                    <div key={`${track.key}-${i}`} style={{
-                        padding: '6px 8px',
-                        borderRight: i === 0 ? `1px solid #e2e8f0` : 'none',
-                    }}>
-                        {/* Row 1: 0 | Parameter Selector | MAX */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, width: '100%' }}>
-                            {/* 0 on left */}
-                            <span style={{
-                                fontSize: 10, fontWeight: 900, color: track.color,
-                                fontFamily: 'sans-serif', minWidth: 14, textAlign: 'center',
-                                background: `${track.color}15`, borderRadius: 4, padding: '2px 4px',
-                                flexShrink: 0,
-                            }}>0</span>
-                            {/* Parameter selector in center */}
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                                <SlidersHorizontal size={10} color={track.color} style={{ flexShrink: 0 }} />
-                                <select
-                                    value={track.key}
-                                    onChange={e => onSelect(e.target.value)}
-                                    style={{
-                                        background: 'transparent', border: 'none', outline: 'none',
-                                        color: track.color, fontSize: 11, fontWeight: 900,
-                                        textTransform: 'uppercase', letterSpacing: 0.5,
-                                        cursor: 'pointer', width: '100%', minWidth: 0,
-                                        appearance: 'none',
-                                        WebkitAppearance: 'none',
-                                        MozAppearance: 'none',
-                                        textOverflow: 'ellipsis',
-                                        padding: '0 2px',
-                                    }}
-                                >
-                                    {TRACK_OPTIONS.map(o => (
-                                        <option key={o.key} value={o.key} style={{ background: '#ffffff', color: '#1e293b' }}>
-                                            {o.title}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                            {/* MAX on right */}
-                            <input
-                                type="number"
-                                value={track.max || ''}
-                                onChange={e => onUpdateMax(parseFloat(e.target.value) || 0)}
-                                placeholder="Max"
-                                style={{
-                                    width: 55, background: `${track.color}15`, border: 'none', outline: 'none',
-                                    borderRadius: 4, padding: '2px 4px',
-                                    fontSize: 10, fontWeight: 900, color: track.color, textAlign: 'center',
-                                    fontFamily: 'sans-serif',
-                                    flexShrink: 0,
-                                }}
-                            />
-                        </div>
-                        {/* Row 2: Live value */}
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                            <span style={{
-                                fontSize: 22, fontWeight: 900, fontFamily: 'sans-serif',
-                                fontVariantNumeric: 'tabular-nums',
-                                color: track.color, lineHeight: 1,
+            {isDepthLog ? (
+                <div style={{
+                    height: 60, boxSizing: 'border-box',
+                    display: 'grid', gridTemplateColumns: '1fr 1fr',
+                    borderTop: `1px solid #e2e8f0`,
+                    background: `#ffffff`,
+                    flexShrink: 0,
+                    overflow: 'hidden',
+                    position: 'sticky',
+                    bottom: 0,
+                    zIndex: 10,
+                    borderBottomLeftRadius: 18,
+                    borderBottomRightRadius: 18,
+                }}>
+                    {pens.map((pen, i) => {
+                        const label = i === 0 ? 'HOLE' : 'BIT';
+                        return (
+                            <div key={label} style={{
+                                padding: '6px 8px',
+                                borderRight: i === 0 ? `1px solid #e2e8f0` : 'none',
                             }}>
-                                {shell(liveValues[track.key])}
-                            </span>
-                            <span style={{
-                                fontSize: 10, color: '#64748b', fontWeight: 700,
-                                textTransform: 'uppercase', letterSpacing: 2,
+                                <div style={{ fontSize: 8, color: '#64748b', fontWeight: 900, letterSpacing: 2, marginBottom: 4 }}>
+                                    {label}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                                    <span style={{
+                                        fontSize: 22, fontWeight: 900, fontFamily: 'sans-serif',
+                                        color: pen.color, lineHeight: 1
+                                    }}>
+                                        {shell(liveValues[pen.metric], 1)}
+                                    </span>
+                                    <span style={{
+                                        fontSize: 10, color: '#64748b', fontWeight: 700,
+                                        textTransform: 'uppercase', letterSpacing: 2
+                                    }}>
+                                        m
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                <div style={{
+                    height: 60, boxSizing: 'border-box',
+                    flexShrink: 0,
+                    borderTop: `1px solid #e2e8f0`,
+                    display: 'grid', 
+                    gridTemplateColumns: `repeat(${pens.length}, 1fr)`,
+                    background: `#ffffff`,
+                    overflow: 'hidden',
+                    position: 'sticky',
+                    bottom: 0,
+                    zIndex: 10,
+                    borderBottomLeftRadius: 18,
+                    borderBottomRightRadius: 18,
+                }}>
+                    {pens.map((pen, i) => {
+                        const opt = TRACK_OPTIONS.find(o => o.key === pen.metric) || { title: pen.metric, unit: '' };
+                        return (
+                            <div key={`${pen.metric}-${i}`} style={{
+                                padding: '6px 8px',
+                                borderRight: i < pens.length - 1 ? `1px solid #e2e8f0` : 'none',
                             }}>
-                                {track.unit}
-                            </span>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                                {/* Row 1: Min | Parameter Selector | Max */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, width: '100%' }}>
+                                    {/* Min */}
+                                    <input
+                                        type="number"
+                                        value={pen.min !== undefined ? pen.min : 0}
+                                        onChange={e => onUpdateMin(i, parseFloat(e.target.value) || 0)}
+                                        placeholder="Min"
+                                        style={{
+                                            width: 45, background: `${pen.color}15`, border: 'none', outline: 'none',
+                                            borderRadius: 4, padding: '2px 4px',
+                                            fontSize: 10, fontWeight: 900, color: pen.color, textAlign: 'center',
+                                            fontFamily: 'sans-serif',
+                                            flexShrink: 0,
+                                        }}
+                                    />
+                                    {/* Parameter dropdown */}
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                                        <SlidersHorizontal size={10} color={pen.color} style={{ flexShrink: 0 }} />
+                                        <select
+                                            value={pen.metric}
+                                            onChange={e => onSelect(i, e.target.value)}
+                                            style={{
+                                                background: 'transparent', border: 'none', outline: 'none',
+                                                color: pen.color, fontSize: 11, fontWeight: 900,
+                                                textTransform: 'uppercase', letterSpacing: 0.5,
+                                                cursor: 'pointer', width: '100%', minWidth: 0,
+                                                appearance: 'none',
+                                                WebkitAppearance: 'none',
+                                                MozAppearance: 'none',
+                                                textOverflow: 'ellipsis',
+                                                padding: '0 2px',
+                                            }}
+                                        >
+                                            {TRACK_OPTIONS.map(o => (
+                                                <option key={o.key} value={o.key} style={{ background: '#ffffff', color: '#1e293b' }}>
+                                                    {o.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    {/* Max */}
+                                    <input
+                                        type="number"
+                                        value={pen.max !== undefined ? pen.max : ''}
+                                        onChange={e => onUpdateMax(i, parseFloat(e.target.value) || 0)}
+                                        placeholder="Max"
+                                        style={{
+                                            width: 55, background: `${pen.color}15`, border: 'none', outline: 'none',
+                                            borderRadius: 4, padding: '2px 4px',
+                                            fontSize: 10, fontWeight: 900, color: pen.color, textAlign: 'center',
+                                            fontFamily: 'sans-serif',
+                                            flexShrink: 0,
+                                        }}
+                                    />
+                                </div>
+                                {/* Row 2: Live value */}
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                                    <span style={{
+                                        fontSize: 22, fontWeight: 900, fontFamily: 'sans-serif',
+                                        fontVariantNumeric: 'tabular-nums',
+                                        color: pen.color, lineHeight: 1,
+                                    }}>
+                                        {shell(liveValues[pen.metric])}
+                                    </span>
+                                    <span style={{
+                                        fontSize: 10, color: '#64748b', fontWeight: 700,
+                                        textTransform: 'uppercase', letterSpacing: 2,
+                                    }}>
+                                        {opt.unit}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
@@ -484,9 +610,374 @@ function TimeDepthColumn({ rows, holeDepth, bitDepth }) {
 
 
 
+// ── EDR Settings Modal ─────────────────────────────────────────────────────────
+function EdrSettingsModal({ isOpen, onClose, tracks = [], onApply, onReset }) {
+    const [tempTracks, setTempTracks] = useState([]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setTempTracks(JSON.parse(JSON.stringify(tracks)));
+        }
+    }, [isOpen, tracks]);
+
+    if (!isOpen) return null;
+
+    const handleStripCountChange = (newCount) => {
+        setTempTracks(prev => {
+            const currentCount = prev.length;
+            if (newCount > currentCount) {
+                const added = [];
+                for (let i = currentCount; i < newCount; i++) {
+                    added.push({
+                        pens: [
+                            { metric: 'WOH', min: 0, max: 300, color: COLOR_PRESETS[i % COLOR_PRESETS.length] }
+                        ]
+                    });
+                }
+                return [...prev, ...added];
+            } else if (newCount < currentCount) {
+                return prev.slice(0, newCount);
+            }
+            return prev;
+        });
+    };
+
+    const handlePenCountChange = (stripIndex, newCount) => {
+        setTempTracks(prev => {
+            return prev.map((strip, sIdx) => {
+                if (sIdx !== stripIndex) return strip;
+                const currentCount = strip.pens.length;
+                if (newCount > currentCount) {
+                    const added = [];
+                    for (let i = currentCount; i < newCount; i++) {
+                        added.push({
+                            metric: 'WOB',
+                            min: 0,
+                            max: 100,
+                            color: COLOR_PRESETS[(stripIndex + i) % COLOR_PRESETS.length]
+                        });
+                    }
+                    return {
+                        ...strip,
+                        pens: [...strip.pens, ...added]
+                    };
+                } else if (newCount < currentCount) {
+                    return {
+                        ...strip,
+                        pens: strip.pens.slice(0, newCount)
+                    };
+                }
+                return strip;
+            });
+        });
+    };
+
+    const handlePenChange = (stripIndex, penIndex, field, value) => {
+        setTempTracks(prev => {
+            return prev.map((strip, sIdx) => {
+                if (sIdx !== stripIndex) return strip;
+                return {
+                    ...strip,
+                    pens: strip.pens.map((pen, pIdx) => {
+                        if (pIdx !== penIndex) return pen;
+                        return { ...pen, [field]: value };
+                    })
+                };
+            });
+        });
+    };
+
+    const handleApply = () => {
+        onApply(tempTracks);
+        onClose();
+    };
+
+    const handleResetLocal = () => {
+        if (window.confirm("Are you sure you want to reset all tracks to defaults?")) {
+            onReset();
+            onClose();
+        }
+    };
+
+    return (
+        <div style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            padding: '16px'
+        }}>
+            <div style={{
+                position: 'relative', width: '100%', maxWidth: '850px',
+                backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                display: 'flex', flexDirection: 'column', maxHeight: '90vh',
+                overflow: 'hidden', color: '#f8fafc'
+            }}>
+                {/* Header */}
+                <div style={{
+                    padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                    background: 'linear-gradient(to right, #0f172a, #1e293b)'
+                }}>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <SlidersHorizontal size={20} color="#6366f1" /> EDR CHART CONFIGURATION SETTINGS
+                    </h2>
+                    <button 
+                        onClick={onClose}
+                        style={{
+                            marginLeft: 'auto', background: 'transparent', border: 'none', color: '#94a3b8',
+                            cursor: 'pointer', padding: 4, display: 'flex', transition: 'color 0.2s'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+                        onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }} className="custom-scrollbar">
+                    {/* Strip Count Selector */}
+                    <div style={{
+                        background: 'rgba(15,23,42,0.4)', padding: '16px', borderRadius: '12px',
+                        border: '1px solid rgba(255,255,255,0.05)', display: 'flex',
+                        alignItems: 'center', justifyContent: 'space-between'
+                    }}>
+                        <div>
+                            <h3 style={{ fontSize: '0.875rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Number of Strips</h3>
+                            <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '4px 0 0 0' }}>Configure how many stacked chart strips to display (1 - 10)</p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <button
+                                disabled={tempTracks.length <= 1}
+                                onClick={() => handleStripCountChange(tempTracks.length - 1)}
+                                style={{
+                                    width: 36, height: 36, borderRadius: '8px', backgroundColor: '#334155',
+                                    border: '1px solid rgba(255,255,255,0.05)', color: '#fff',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    opacity: tempTracks.length <= 1 ? 0.3 : 1
+                                }}
+                            >
+                                <Minus size={16} />
+                            </button>
+                            <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#818cf8', width: 24, textAlign: 'center', fontFamily: 'monospace' }}>
+                                {tempTracks.length}
+                            </span>
+                            <button
+                                disabled={tempTracks.length >= 10}
+                                onClick={() => handleStripCountChange(tempTracks.length + 1)}
+                                style={{
+                                    width: 36, height: 36, borderRadius: '8px', backgroundColor: '#334155',
+                                    border: '1px solid rgba(255,255,255,0.05)', color: '#fff',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    opacity: tempTracks.length >= 10 ? 0.3 : 1
+                                }}
+                            >
+                                <Plus size={16} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Per-Strip Configuration */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {tempTracks.map((strip, sIdx) => (
+                            <div key={sIdx} style={{
+                                backgroundColor: 'rgba(15,23,42,0.3)', border: '1px solid rgba(255,255,255,0.05)',
+                                borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12
+                            }}>
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', justifycontent: 'space-between',
+                                    borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 8,
+                                    justifyContent: 'space-between'
+                                }}>
+                                    <span style={{ fontSize: '0.875rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span style={{
+                                            width: 20, height: 20, borderRadius: 4, backgroundColor: 'rgba(99,102,241,0.2)',
+                                            color: '#818cf8', display: 'flex', alignItems: 'center', justifycontent: 'center',
+                                            fontFamily: 'monospace', fontSize: '0.75rem', justifyContent: 'center'
+                                        }}>{sIdx + 1}</span>
+                                        Strip {sIdx + 1}
+                                    </span>
+
+                                    {/* Number of Pens */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Pens:</span>
+                                        <div style={{ display: 'flex', gap: 4, backgroundColor: 'rgba(51,65,85,0.8)', padding: 2, borderRadius: 6 }}>
+                                            {[1, 2, 3, 4, 5, 6].map(num => (
+                                                <button
+                                                    key={num}
+                                                    onClick={() => handlePenCountChange(sIdx, num)}
+                                                    style={{
+                                                        padding: '2px 8px', borderRadius: 4, border: 'none',
+                                                        fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer',
+                                                        backgroundColor: strip.pens.length === num ? '#6366f1' : 'transparent',
+                                                        color: strip.pens.length === num ? '#fff' : '#94a3b8',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                >
+                                                    {num}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Pens Rows */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    {strip.pens.map((pen, pIdx) => (
+                                        <div key={pIdx} style={{
+                                            display: 'grid', gridTemplateColumns: '80px 1.5fr 1fr 1fr 1.5fr',
+                                            gap: 12, alignItems: 'center', backgroundColor: 'rgba(51,65,85,0.15)',
+                                            padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.03)'
+                                        }}>
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>
+                                                Pen {pIdx + 1}
+                                            </div>
+
+                                            {/* Parameter selector */}
+                                            <div>
+                                                <select
+                                                    value={pen.metric}
+                                                    onChange={e => handlePenChange(sIdx, pIdx, 'metric', e.target.value)}
+                                                    style={{
+                                                        width: '100%', backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)',
+                                                        borderRadius: 6, padding: '6px 8px', fontSize: '0.75rem', fontWeight: 700,
+                                                        color: '#fff', outline: 'none'
+                                                    }}
+                                                >
+                                                    {TRACK_OPTIONS.map(o => (
+                                                        <option key={o.key} value={o.key}>
+                                                            {o.title}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Min */}
+                                            <div>
+                                                <input
+                                                    type="number"
+                                                    value={pen.min !== undefined ? pen.min : 0}
+                                                    onChange={e => handlePenChange(sIdx, pIdx, 'min', parseFloat(e.target.value) || 0)}
+                                                    placeholder="Min"
+                                                    style={{
+                                                        width: '100%', backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)',
+                                                        borderRadius: 6, padding: '6px 4px', fontSize: '0.75rem', fontWeight: 700,
+                                                        color: '#fff', outline: 'none', textAlign: 'center', fontFamily: 'monospace'
+                                                    }}
+                                                />
+                                            </div>
+
+                                            {/* Max */}
+                                            <div>
+                                                <input
+                                                    type="number"
+                                                    value={pen.max !== undefined ? pen.max : 100}
+                                                    onChange={e => handlePenChange(sIdx, pIdx, 'max', parseFloat(e.target.value) || 0)}
+                                                    placeholder="Max"
+                                                    style={{
+                                                        width: '100%', backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)',
+                                                        borderRadius: 6, padding: '6px 4px', fontSize: '0.75rem', fontWeight: 700,
+                                                        color: '#fff', outline: 'none', textAlign: 'center', fontFamily: 'monospace'
+                                                    }}
+                                                />
+                                            </div>
+
+                                            {/* Color selector */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <div style={{
+                                                        width: 20, height: 20, borderRadius: 4, backgroundColor: pen.color,
+                                                        border: '1px solid rgba(255,255,255,0.2)', flexShrink: 0
+                                                    }} />
+                                                    <input
+                                                        type="text"
+                                                        value={pen.color}
+                                                        onChange={e => handlePenChange(sIdx, pIdx, 'color', e.target.value)}
+                                                        style={{
+                                                            width: '100%', backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)',
+                                                            borderRadius: 6, padding: '4px 6px', fontSize: '0.7rem', fontWeight: 700,
+                                                            color: '#fff', outline: 'none', fontFamily: 'monospace'
+                                                        }}
+                                                    />
+                                                </div>
+                                                {/* Preset colors */}
+                                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                                    {COLOR_PRESETS.map(preset => (
+                                                        <button
+                                                            key={preset}
+                                                            onClick={() => handlePenChange(sIdx, pIdx, 'color', preset)}
+                                                            style={{
+                                                                width: 12, height: 12, borderRadius: '50%', backgroundColor: preset,
+                                                                border: pen.color === preset ? '1px solid #fff' : 'none',
+                                                                cursor: 'pointer', padding: 0, flexShrink: 0
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div style={{
+                    padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    borderTop: '1px solid rgba(255,255,255,0.08)', backgroundColor: '#0f172a'
+                }}>
+                    <button
+                        onClick={handleResetLocal}
+                        style={{
+                            background: 'transparent', border: 'none', color: '#ef4444',
+                            fontWeight: 900, fontSize: '0.75rem', letterSpacing: '0.05em',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                        }}
+                    >
+                        <RotateCcw size={14} /> RESET TO DEFAULTS
+                    </button>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                        <button
+                            onClick={onClose}
+                            style={{
+                                background: 'transparent', border: 'none', color: '#94a3b8',
+                                fontWeight: 900, fontSize: '0.75rem', letterSpacing: '0.05em',
+                                cursor: 'pointer', padding: '8px 16px'
+                            }}
+                        >
+                            CANCEL
+                        </button>
+                        <button
+                            onClick={handleApply}
+                            style={{
+                                backgroundColor: '#4f46e5', border: 'none', color: '#fff',
+                                fontWeight: 900, fontSize: '0.75rem', letterSpacing: '0.05em',
+                                cursor: 'pointer', padding: '10px 20px', borderRadius: 8,
+                                boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.4)'
+                            }}
+                        >
+                            APPLY CHANGES
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
 // ── Main EDR Page ──────────────────────────────────────────────────────────────
 export default function EDR() {
     const role = getStoredRole();
+    const scrollContainerRef = useRef(null);
+    const [clickedTimestamp, setClickedTimestamp] = useState(null);
+
+    const handleChartClick = (timestamp) => {
+        setClickedTimestamp(prev => prev === timestamp ? null : timestamp);
+    };
     const isScrollable = role === 'admin' || role === 'viewer';
     const [rigData,       setRigData]       = useState({});
     const [history,       setHistory]       = useState([]);
@@ -496,22 +987,52 @@ export default function EDR() {
     const [customEnd,     setCustomEnd]     = useState(() => toLocalDatetimeString(new Date()));
     const [pickerStart,   setPickerStart]   = useState(customStart);
     const [pickerEnd,     setPickerEnd]     = useState(customEnd);
-    const [pairs,         setPairs]         = useState(() => {
+    const [tracks, setTracks] = useState(() => {
         try {
-            const saved = localStorage.getItem('edrPairs');
-            const parsed = saved ? JSON.parse(saved) : null;
-            if (parsed && parsed.length === 3) return parsed;
-            return DEFAULT_PAIRS;
-        } catch {
-            return DEFAULT_PAIRS;
+            const saved = localStorage.getItem('edrTracks') || localStorage.getItem('edrPairs');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    if (parsed[0] && Array.isArray(parsed[0].pens)) {
+                        return parsed;
+                    }
+                    if (Array.isArray(parsed[0])) {
+                        return parsed.map((strip, idx) => {
+                            const colors = ['#1d4ed8', '#ec4899', '#0d9488', '#ea580c', '#6366f1', '#e11d48'];
+                            return {
+                                pens: strip.map((pen, pIdx) => ({
+                                    metric: pen.key || pen.metric,
+                                    min: pen.min !== undefined ? pen.min : 0,
+                                    max: pen.max !== undefined ? pen.max : 100,
+                                    color: pen.color || colors[pIdx % colors.length]
+                                }))
+                            };
+                        });
+                    }
+                    if (parsed[0] && (parsed[0].left || parsed[0].right)) {
+                        return parsed.map((strip) => {
+                            const pens = [];
+                            if (strip.left) pens.push({ metric: strip.left.metric || strip.left.key, min: strip.left.min || 0, max: strip.left.max, color: '#1d4ed8' });
+                            if (strip.right) pens.push({ metric: strip.right.metric || strip.right.key, min: strip.right.min || 0, max: strip.right.max, color: '#ec4899' });
+                            return { pens };
+                        });
+                    }
+                }
+            }
+            return DEFAULT_TRACKS;
+        } catch (e) {
+            console.error("Failed to parse EDR layout config:", e);
+            return DEFAULT_TRACKS;
         }
     });
     const [showExportModal, setShowExportModal] = useState(false);
-    const selectedKeys = useMemo(() => pairs.flatMap(p => [p[0].key, p[1].key]), [pairs]);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const selectedKeys = useMemo(() => tracks.flatMap(t => t.pens.map(p => p.metric)), [tracks]);
 
     useEffect(() => {
-        localStorage.setItem('edrPairs', JSON.stringify(pairs));
-    }, [pairs]);
+        localStorage.setItem('edrTracks', JSON.stringify(tracks));
+        localStorage.setItem('edrPairs', JSON.stringify(tracks));
+    }, [tracks]);
 
     // Synchronize inputs when active custom endpoints change programmatically (e.g. on Zoom or Banner action)
     useEffect(() => {
@@ -590,6 +1111,34 @@ export default function EDR() {
         setIsCustomRange(true);
     };
 
+    // Handle arrow keys navigation for scrolling
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (document.activeElement && (
+                document.activeElement.tagName === 'INPUT' || 
+                document.activeElement.tagName === 'SELECT' || 
+                document.activeElement.tagName === 'TEXTAREA'
+            )) {
+                return;
+            }
+
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                const container = scrollContainerRef.current;
+                if (container) {
+                    e.preventDefault();
+                    const scrollAmount = 80;
+                    if (e.key === 'ArrowDown') {
+                        container.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+                    } else {
+                        container.scrollBy({ top: -scrollAmount, behavior: 'smooth' });
+                    }
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
     useEffect(() => {
         const fetchLive = async () => {
             const d = await getRigData();
@@ -619,13 +1168,81 @@ export default function EDR() {
     const holeDepth = getFieldValue(rigData, ['Depth', 'DEPTH']);
     const bitDepth  = getFieldValue(rigData, ['BitDepth', 'BITDEPTH', 'BIT DEPTH']);
 
+    const chartConfig = useMemo(() => {
+        let durationMs = 1800_000; // default 30m
+        if (isCustomRange) {
+            const startTs = new Date(customStart).getTime();
+            const endTs = new Date(customEnd).getTime();
+            if (Number.isFinite(startTs) && Number.isFinite(endTs) && startTs < endTs) {
+                durationMs = endTs - startTs;
+            }
+        } else {
+            const match = timeRange.match(/-(\d+)([mhd])/i);
+            if (match) {
+                const val = parseInt(match[1], 10);
+                const unit = match[2].toLowerCase();
+                durationMs = val * (unit === 'd' ? 86400000 : unit === 'h' ? 3600000 : 60000);
+            }
+        }
+
+        // Map duration to height and downsample limit
+        let height = 1200;
+        let limit = 240;
+
+        if (durationMs <= 60_000) { // 1 min
+            height = 600;
+            limit = 150;
+        } else if (durationMs <= 300_000) { // 5 min
+            height = 900;
+            limit = 300;
+        } else if (durationMs <= 900_000) { // 15 min
+            height = 1200;
+            limit = 450;
+        } else if (durationMs <= 1800_000) { // 30 min
+            height = 1800;
+            limit = 600;
+        } else if (durationMs <= 3600_000) { // 1 hour
+            height = 3000;
+            limit = 1000;
+        } else if (durationMs <= 21600_000) { // 6 hours
+            height = 7200;
+            limit = 2000;
+        } else if (durationMs <= 43200_000) { // 12 hours
+            height = 12000;
+            limit = 3000;
+        } else if (durationMs <= 86400_000) { // 24 hours
+            height = 20000;
+            limit = 4000;
+        } else { // larger than 24 hours
+            height = 24000;
+            limit = 5000;
+        }
+
+        return { height, limit, durationMs };
+    }, [isCustomRange, customStart, customEnd, timeRange]);
+
+    const computedTimeDomain = useMemo(() => {
+        if (isCustomRange && customStart && customEnd) {
+            const startTs = new Date(customStart).getTime();
+            const endTs = new Date(customEnd).getTime();
+            if (Number.isFinite(startTs) && Number.isFinite(endTs) && startTs < endTs) {
+                return [startTs, endTs];
+            }
+        }
+        // Find latest timestamp in history, default to Date.now() if no history
+        const latestTs = history.length > 0 && history[history.length - 1]?.time
+            ? new Date(history[history.length - 1].time).getTime()
+            : Date.now();
+        return [latestTs - chartConfig.durationMs, latestTs];
+    }, [isCustomRange, customStart, customEnd, chartConfig.durationMs, history]);
+
     const chartHistory = useMemo(() => (
-        downsampleRows(history, 240)
-    ), [history]);
+        downsampleRows(history, chartConfig.limit)
+    ), [history, chartConfig.limit]);
 
     const depthLogHistory = useMemo(() => (
-        downsampleRows(history, 60)
-    ), [history]);
+        downsampleRows(history, Math.round(chartConfig.limit / 4))
+    ), [history, chartConfig.limit]);
 
     const trackData = useMemo(() =>
         chartHistory.map((row, i) => {
@@ -655,16 +1272,7 @@ export default function EDR() {
         return obj;
     }, [rigData]);
 
-    const customTimeDomain = useMemo(() => {
-        if (!isCustomRange || !customStart || !customEnd) return null;
-        const startTs = new Date(customStart).getTime();
-        const endTs = new Date(customEnd).getTime();
-        if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || startTs >= endTs) return null;
-        return [startTs, endTs];
-    }, [isCustomRange, customStart, customEnd]);
-
-    const customDurationMs = customTimeDomain ? (customTimeDomain[1] - customTimeDomain[0]) : 0;
-    const xAxisTimeFormatter = (value) => fmtAxisTimeByRange(value, customDurationMs);
+    const xAxisTimeFormatter = (value) => fmtAxisTimeByRange(value, chartConfig.durationMs);
 
     const lastHistoryTime = history.length > 0 ? history[history.length - 1]?.time : null;
     const selectedEndTime = isCustomRange && customEnd ? new Date(customEnd).getTime() : null;
@@ -675,25 +1283,48 @@ export default function EDR() {
         new Date(lastHistoryTime).getTime() < selectedEndTime - 60_000
     );
 
-    const updatePair = (pi, slot, k) => {
-        setPairs(prev => {
-            const n = prev.map(p => [...p]);
-            if (typeof k === 'string') {
-                // Changing parameter key
-                n[pi][slot] = { ...n[pi][slot], key: k };
-            } else if (typeof k === 'object') {
-                // Updating entire object (e.g. key + max)
-                n[pi][slot] = { ...n[pi][slot], ...k };
-            }
-            return n;
+    const updatePenMetric = (trackIndex, penIndex, metric) => {
+        setTracks(prev => {
+            return prev.map((t, ti) => {
+                if (ti !== trackIndex) return t;
+                return {
+                    ...t,
+                    pens: t.pens.map((p, pi) => {
+                        if (pi !== penIndex) return p;
+                        return { ...p, metric };
+                    })
+                };
+            });
         });
     };
 
-    const updateMax = (pi, slot, m) => {
-        setPairs(prev => {
-            const n = prev.map(p => [...p]);
-            n[pi][slot] = { ...n[pi][slot], max: m };
-            return n;
+    const updatePenMin = (trackIndex, penIndex, min) => {
+        setTracks(prev => {
+            return prev.map((t, ti) => {
+                if (ti !== trackIndex) return t;
+                return {
+                    ...t,
+                    pens: t.pens.map((p, pi) => {
+                        if (pi !== penIndex) return p;
+                        return { ...p, min };
+                    })
+                };
+            });
+        });
+    };
+
+    const updatePenMax = (trackIndex, penIndex, max) => {
+        setTracks(prev => {
+            return prev.map((t, ti) => {
+                if (ti !== trackIndex) return t;
+                return {
+                    ...t,
+                    pens: t.pens.map((p, pi) => {
+                        if (pi !== penIndex) return p;
+                        return { ...p, max };
+                    })
+                };
+            });
         });
     };
 
@@ -809,6 +1440,24 @@ export default function EDR() {
                     onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
                     <Download size={10} /> EXPORT
+                </button>
+
+                {/* Settings Button */}
+                <button
+                    onClick={() => setShowSettingsModal(true)}
+                    style={{
+                        padding: '4px 12px', borderRadius: 8, cursor: 'pointer',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: '#fff',
+                        fontSize: 10, fontWeight: 900, letterSpacing: 2, display: 'flex', alignItems: 'center', gap: 5,
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        transition: 'all 0.2s',
+                        marginLeft: 4
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                    <SlidersHorizontal size={10} /> SETTINGS
                 </button>
 
 
@@ -933,42 +1582,60 @@ export default function EDR() {
             {/* ── Track Grid ── */}
             <div className="capture-target-graph" style={{
                 flex: 1, minHeight: 0,
-                display: 'grid',
-                gridTemplateColumns: '120px repeat(3, 1fr)',
-                gap: 10, padding: '0 10px',
+                display: 'flex', flexDirection: 'row',
+                overflowX: 'auto', overflowY: 'hidden',
+                padding: '0 10px', gap: 10,
+                height: '100%',
+                background: '#0c1220'
             }}>
-                {/* Depth/Time Axis Column */}
-                <TimeDepthColumn rows={timeDepthRows} holeDepth={holeDepth} bitDepth={bitDepth} />
-
-                {/* Tracks */}
-                {pairs.map((p, pi) => {
-                    const opt1 = TRACK_OPTIONS.find(o => o.key === p[0].key) || TRACK_OPTIONS[0];
-                    const opt2 = TRACK_OPTIONS.find(o => o.key === p[1].key) || TRACK_OPTIONS[1];
-
-                    // Retrieve fixed static colors for the panel
-                    const colors = PANEL_COLORS[pi] || { c1: '#2563eb', c2: '#06b6d4' };
-
-                    // Merge state with metadata and override colors
-                    const t1 = { ...opt1, max: p[0].max, color: colors.c1 };
-                    const t2 = { ...opt2, max: p[1].max, color: colors.c2 };
-
-                    return (
+                {/* Scrollable area for all strips side-by-side */}
+                <div 
+                    ref={scrollContainerRef}
+                    style={{
+                        display: 'flex', flexDirection: 'row',
+                        flex: 1, height: '100%',
+                        overflowY: 'auto', gap: 10
+                    }} 
+                    className="custom-scrollbar"
+                >
+                    
+                    {/* Depth Log (Width: 180px) */}
+                    <div style={{ width: 180, flexShrink: 0, height: chartConfig.height }}>
                         <DualTrackPanel
-                            key={pi}
-                            panelIdx={pi}
-                            track1={t1}
-                            track2={t2}
+                            panelIdx={-1}
+                            isDepthLog={true}
+                            pens={[
+                                { metric: 'Depth', min: 0, max: 5000, color: '#0369a1' },
+                                { metric: 'BitDepth', min: 0, max: 5000, color: '#6d28d9' }
+                            ]}
                             data={trackData}
                             liveValues={liveValues}
-                            timeDomain={customTimeDomain}
+                            timeDomain={computedTimeDomain}
                             timeLabelFormatter={xAxisTimeFormatter}
-                            onSelect1={k => updatePair(pi, 0, k)}
-                            onSelect2={k => updatePair(pi, 1, k)}
-                            onUpdateMax1={m => updateMax(pi, 0, m)}
-                            onUpdateMax2={m => updateMax(pi, 1, m)}
+                            clickedTimestamp={clickedTimestamp}
+                            onClick={handleChartClick}
                         />
-                    );
-                })}
+                    </div>
+
+                    {/* Tracks */}
+                    {tracks.map((track, pi) => (
+                        <div key={pi} style={{ flex: 1, minWidth: 220, flexShrink: 0, height: chartConfig.height }}>
+                            <DualTrackPanel
+                                panelIdx={pi}
+                                pens={track.pens}
+                                data={trackData}
+                                liveValues={liveValues}
+                                timeDomain={computedTimeDomain}
+                                timeLabelFormatter={xAxisTimeFormatter}
+                                clickedTimestamp={clickedTimestamp}
+                                onClick={handleChartClick}
+                                onSelect={(penIdx, metric) => updatePenMetric(pi, penIdx, metric)}
+                                onUpdateMin={(penIdx, min) => updatePenMin(pi, penIdx, min)}
+                                onUpdateMax={(penIdx, max) => updatePenMax(pi, penIdx, max)}
+                            />
+                        </div>
+                    ))}
+                </div>
             </div>
 
             <ExportDataModal 
@@ -976,6 +1643,14 @@ export default function EDR() {
                 onClose={() => setShowExportModal(false)} 
                 selectedKeys={selectedKeys}
                 allOptions={TRACK_OPTIONS.map(o => ({ key: o.key, label: o.title }))}
+            />
+
+            <EdrSettingsModal
+                isOpen={showSettingsModal}
+                onClose={() => setShowSettingsModal(false)}
+                tracks={tracks}
+                onApply={newTracks => setTracks(newTracks)}
+                onReset={() => setTracks(DEFAULT_TRACKS)}
             />
 
             <style dangerouslySetInnerHTML={{ __html: `
